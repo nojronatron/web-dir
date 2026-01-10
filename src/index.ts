@@ -6,6 +6,16 @@ const app: Express = express();
 const PORT = process.env.PORT || 3000;
 const SERVE_DIR = process.env.SERVE_DIR || process.cwd();
 
+// HTML escape function to prevent XSS attacks
+function escapeHtml(unsafe: string): string {
+  return unsafe
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 // Serve static files from the specified directory
 app.use(express.static(SERVE_DIR));
 
@@ -28,14 +38,14 @@ app.get('*', (req: Request, res: Response) => {
         
         const fileList = files.map(file => {
           const filePath = path.join(req.path, file);
-          return `<li><a href="${filePath}">${file}</a></li>`;
+          return `<li><a href="${escapeHtml(filePath)}">${escapeHtml(file)}</a></li>`;
         }).join('');
         
         res.send(`
           <!DOCTYPE html>
           <html>
             <head>
-              <title>Directory Listing - ${req.path}</title>
+              <title>Directory Listing - ${escapeHtml(req.path)}</title>
               <style>
                 body { font-family: Arial, sans-serif; margin: 20px; }
                 h1 { color: #333; }
@@ -46,7 +56,7 @@ app.get('*', (req: Request, res: Response) => {
               </style>
             </head>
             <body>
-              <h1>Directory: ${req.path}</h1>
+              <h1>Directory: ${escapeHtml(req.path)}</h1>
               <ul>
                 ${req.path !== '/' ? '<li><a href="..">..</a></li>' : ''}
                 ${fileList}
