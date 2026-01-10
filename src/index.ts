@@ -1,0 +1,88 @@
+import express, { Express, Request, Response } from 'express';
+import path from 'path';
+import fs from 'fs';
+
+const app: Express = express();
+const PORT = process.env.PORT || 3000;
+const SERVE_DIR = process.env.SERVE_DIR || process.cwd();
+
+// HTML escape function to prevent XSS attacks
+function escapeHtml(unsafe: string): string {
+  return unsafe
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+// Serve static files from the specified directory
+app.use(express.static(SERVE_DIR));
+
+// List directory contents
+app.get('*', (req: Request, res: Response) => {
+  // Resolve the full path and ensure it's within SERVE_DIR to prevent path traversal
+  const requestedPath = path.resolve(SERVE_DIR, '.' + req.path);
+  
+  // Validate that the requested path is within the serve directory
+  if (!requestedPath.startsWith(path.resolve(SERVE_DIR))) {
+    res.status(403).send('Forbidden: Access denied');
+    return;
+  }
+  
+  fs.stat(requestedPath, (err, stats) => {
+    if (err) {
+      res.status(404).send('File or directory not found');
+      return;
+    }
+    
+    if (stats.isDirectory()) {
+      fs.readdir(requestedPath, (err, files) => {
+        if (err) {
+          res.status(500).send('Error reading directory');
+          return;
+        }
+        
+        const fileList = files.map(file => {
+          const filePath = path.join(req.path, file);
+          return `<li><a href="${escapeHtml(filePath)}">${escapeHtml(file)}</a></li>`;
+        }).join('');
+        
+        res.send(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <title>Directory Listing - ${escapeHtml(req.path)}</title>
+              <style>
+                body { font-family: Arial, sans-serif; margin: 20px; }
+                h1 { color: #333; }
+                ul { list-style-type: none; padding: 0; }
+                li { padding: 5px 0; }
+                a { text-decoration: none; color: #0066cc; }
+                a:hover { text-decoration: underline; }
+              </style>
+            </head>
+            <body>
+              <h1>Directory: ${escapeHtml(req.path)}</h1>
+              <ul>
+                ${req.path !== '/' ? '<li><a href="..">..</a></li>' : ''}
+                ${fileList}
+              </ul>
+            </body>
+          </html>
+        `);
+      });
+    } else {
+      // File is served by express.static middleware, but if we reach here,
+      // it means the static middleware didn't handle it, so send the file
+      res.sendFile(requestedPath);
+    }
+  });
+});
+
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`Serving directory: ${SERVE_DIR}`);
+});
+
+export default app;

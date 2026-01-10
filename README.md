@@ -2,7 +2,7 @@
 
 Target a directory for easily sharing files using HTTP.
 
-## Overview
+## Description
 
 A simple Express.js 5 web server that allows remote anonymous users to view and download files from a local directory. Designed for use on completely private networks with no authentication required.
 
@@ -22,6 +22,7 @@ A simple Express.js 5 web server that allows remote anonymous users to view and 
 ## Installation
 
 1. Clone the repository:
+
 ```bash
 git clone https://github.com/nojronatron/web-dir.git
 cd web-dir
@@ -43,11 +44,38 @@ DIR_SHARE=/path/to/your/shared/directory
 PORT=3000
 ```
 
+## Development
+
+```bash
+# Install dependencies
+npm install
+
+# Build the project
+npm run build
+
+# Run in development mode
+npm run dev
+
+# Run tests
+npm test
+
+# Lint code
+npm run lint
+
+# Fix lint issues
+npm run lint:fix
+```
+
 ## Usage
 
 Start the server:
+
 ```bash
+# Start the server (default port 3000, serves current directory)
 npm start
+
+# Specify custom directory and port
+PORT=8080 SERVE_DIR=/path/to/directory npm start
 ```
 
 The server will start on the port specified in your `.env` file (default: 3000).
@@ -65,6 +93,11 @@ The server is configured using environment variables in a `.env` file:
 
 - `DIR_SHARE` (required): The absolute or relative path to the directory containing files to share
 - `PORT` (optional): The port number for the web server (default: 3000)
+
+## Environment Variables
+
+- `PORT` - Server port (default: 3000)
+- `SERVE_DIR` - Directory to serve files from (default: current working directory)
 
 ## Security Notes
 
