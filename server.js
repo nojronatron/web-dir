@@ -11,7 +11,13 @@ if (fs.existsSync(envPath)) {
     if (trimmed && !trimmed.startsWith('#')) {
       const [key, ...valueParts] = trimmed.split('=');
       if (key && valueParts.length > 0) {
-        process.env[key.trim()] = valueParts.join('=').trim();
+        let value = valueParts.join('=').trim();
+        // Handle quoted values
+        if ((value.startsWith('"') && value.endsWith('"')) ||
+            (value.startsWith("'") && value.endsWith("'"))) {
+          value = value.slice(1, -1);
+        }
+        process.env[key.trim()] = value;
       }
     }
   });
@@ -45,7 +51,7 @@ console.log(`Sharing directory: ${sharedDir}`);
 
 // Route to list files
 app.get('/', (req, res) => {
-  fs.readdir(sharedDir, { withFileTypes: true }, (err, entries) => {
+  fs.readdir(sharedDir, { withFileTypes: true }, async (err, entries) => {
     if (err) {
       console.error('Error reading directory:', err);
       return res.status(500).send('Error reading directory');
@@ -54,16 +60,25 @@ app.get('/', (req, res) => {
     // Filter to only files (not directories)
     const files = entries.filter(entry => entry.isFile());
 
-    // Get file stats for creation date
-    const fileStats = files.map(file => {
+    // Get file stats for creation date (async)
+    const fileStatsPromises = files.map(async file => {
       const filePath = path.join(sharedDir, file.name);
-      const stats = fs.statSync(filePath);
-      return {
-        name: file.name,
-        birthtime: stats.birthtime,
-        size: stats.size
-      };
+      try {
+        const stats = await fs.promises.stat(filePath);
+        return {
+          name: file.name,
+          birthtime: stats.birthtime,
+          size: stats.size
+        };
+      } catch (statErr) {
+        // File might have been deleted between readdir and stat
+        console.warn(`Warning: Could not stat file ${file.name}:`, statErr);
+        return null;
+      }
     });
+
+    const fileStatsResults = await Promise.all(fileStatsPromises);
+    const fileStats = fileStatsResults.filter(stat => stat !== null);
 
     // Generate HTML response
     let html = `
