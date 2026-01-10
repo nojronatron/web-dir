@@ -21,7 +21,14 @@ app.use(express.static(SERVE_DIR));
 
 // List directory contents
 app.get('*', (req: Request, res: Response) => {
-  const requestedPath = path.join(SERVE_DIR, req.path);
+  // Resolve the full path and ensure it's within SERVE_DIR to prevent path traversal
+  const requestedPath = path.resolve(SERVE_DIR, '.' + req.path);
+  
+  // Validate that the requested path is within the serve directory
+  if (!requestedPath.startsWith(path.resolve(SERVE_DIR))) {
+    res.status(403).send('Forbidden: Access denied');
+    return;
+  }
   
   fs.stat(requestedPath, (err, stats) => {
     if (err) {
@@ -65,6 +72,10 @@ app.get('*', (req: Request, res: Response) => {
           </html>
         `);
       });
+    } else {
+      // File is served by express.static middleware, but if we reach here,
+      // it means the static middleware didn't handle it, so send the file
+      res.sendFile(requestedPath);
     }
   });
 });
