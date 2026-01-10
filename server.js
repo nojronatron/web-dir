@@ -49,6 +49,24 @@ if (!fs.statSync(sharedDir).isDirectory()) {
 
 console.log(`Sharing directory: ${sharedDir}`);
 
+// HTML escape function to prevent XSS
+function escapeHtml(text) {
+  const map = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  };
+  return text.replace(/[&<>"']/g, m => map[m]);
+}
+
+// Check if a path is within the shared directory
+function isPathSafe(filePath) {
+  const relative = path.relative(sharedDir, filePath);
+  return relative && !relative.startsWith('..') && !path.isAbsolute(relative);
+}
+
 // Route to list files
 app.get('/', (req, res) => {
   fs.readdir(sharedDir, { withFileTypes: true }, async (err, entries) => {
@@ -152,9 +170,10 @@ app.get('/', (req, res) => {
 
       fileStats.forEach(file => {
         const dateCreated = file.birthtime.toLocaleString();
+        const escapedName = escapeHtml(file.name);
         html += `
       <tr>
-        <td><a href="/download/${encodeURIComponent(file.name)}">${file.name}</a></td>
+        <td><a href="/download/${encodeURIComponent(file.name)}">${escapedName}</a></td>
         <td>${dateCreated}</td>
       </tr>
 `;
@@ -176,35 +195,42 @@ app.get('/', (req, res) => {
 });
 
 // Route to download files
-app.get('/download/:filename', (req, res) => {
+app.get('/download/:filename', async (req, res) => {
   const filename = req.params.filename;
   const filePath = path.join(sharedDir, filename);
 
   // Security: Prevent directory traversal attacks
   const resolvedPath = path.resolve(filePath);
-  if (!resolvedPath.startsWith(sharedDir)) {
+  if (!isPathSafe(resolvedPath)) {
     return res.status(403).send('Access denied');
   }
 
-  // Check if file exists
-  if (!fs.existsSync(resolvedPath)) {
-    return res.status(404).send('File not found');
-  }
-
-  // Check if it's a file (not a directory)
-  if (!fs.statSync(resolvedPath).isFile()) {
-    return res.status(400).send('Not a file');
-  }
-
-  // Send the file as a download
-  res.download(resolvedPath, filename, (err) => {
-    if (err) {
-      console.error('Error downloading file:', err);
-      if (!res.headersSent) {
-        res.status(500).send('Error downloading file');
-      }
+  try {
+    // Check if file exists and get stats (async)
+    const stats = await fs.promises.stat(resolvedPath);
+    
+    // Check if it's a file (not a directory)
+    if (!stats.isFile()) {
+      return res.status(400).send('Not a file');
     }
-  });
+
+    // Send the file as a download
+    res.download(resolvedPath, filename, (err) => {
+      if (err) {
+        console.error('Error downloading file:', err);
+        if (!res.headersSent) {
+          res.status(500).send('Error downloading file');
+        }
+      }
+    });
+  } catch (err) {
+    // File doesn't exist or other error
+    if (err.code === 'ENOENT') {
+      return res.status(404).send('File not found');
+    }
+    console.error('Error accessing file:', err);
+    return res.status(500).send('Error accessing file');
+  }
 });
 
 // Start the server
