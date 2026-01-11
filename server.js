@@ -97,6 +97,7 @@ app.get('/', (req, res) => {
 
     const fileStatsResults = await Promise.all(fileStatsPromises);
     const fileStats = fileStatsResults.filter(stat => stat !== null);
+    fileStats.sort((a, b) => b.birthtime.getTime() - a.birthtime.getTime());
 
     // Generate HTML response
     let html = `
