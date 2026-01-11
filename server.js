@@ -193,7 +193,7 @@ app.get('/', (req, res) => {
   <div class="card">
     <h3 class="card-title">${escapedName}</h3>
     <a href="/download/${encodedName}">
-      <img src="/download/${encodedName}" alt="${escapedName}" loading="lazy" width="200" height="200">
+      <img src="/download/${encodedName}" alt="${escapedName}" loading="lazy">
     </a>
   </div>
 `;
