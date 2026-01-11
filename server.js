@@ -195,17 +195,17 @@ app.get('/', (req, res) => {
 });
 
 // Route to download files
-app.get('/download/:filename', async (req, res) => {
-  const filename = req.params.filename;
-  const filePath = path.join(sharedDir, filename);
-
-  // Security: Prevent directory traversal attacks
-  const resolvedPath = path.resolve(filePath);
-  if (!isPathSafe(resolvedPath)) {
-    return res.status(403).send('Access denied');
-  }
-
+app.get('/download/:filename', async (req, res, next) => {
   try {
+    const filename = req.params.filename;
+    const filePath = path.join(sharedDir, filename);
+
+    // Security: Prevent directory traversal attacks
+    const resolvedPath = path.resolve(filePath);
+    if (!isPathSafe(resolvedPath)) {
+      return res.status(403).send('Access denied');
+    }
+
     // Check if file exists and get stats (async)
     const stats = await fs.promises.stat(resolvedPath);
     
@@ -219,7 +219,7 @@ app.get('/download/:filename', async (req, res) => {
       if (err) {
         console.error('Error downloading file:', err);
         if (!res.headersSent) {
-          res.status(500).send('Error downloading file');
+          next(err);
         }
       }
     });

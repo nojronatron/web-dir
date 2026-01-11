@@ -2,9 +2,52 @@ import express, { Express, Request, Response } from 'express';
 import path from 'path';
 import fs from 'fs';
 
+// Load environment variables from .env file if it exists
+const envPath = path.join(__dirname, '..', '.env');
+if (fs.existsSync(envPath)) {
+  const envContent = fs.readFileSync(envPath, 'utf-8');
+  envContent.split('\n').forEach(line => {
+    const trimmed = line.trim();
+    if (trimmed && !trimmed.startsWith('#')) {
+      const [key, ...valueParts] = trimmed.split('=');
+      if (key && valueParts.length > 0) {
+        let value = valueParts.join('=').trim();
+        // Handle quoted values
+        if ((value.startsWith('"') && value.endsWith('"')) ||
+            (value.startsWith("'") && value.endsWith("'"))) {
+          value = value.slice(1, -1);
+        }
+        process.env[key.trim()] = value;
+      }
+    }
+  });
+}
+
 const app: Express = express();
 const PORT = process.env.PORT || 3000;
-const SERVE_DIR = process.env.SERVE_DIR || process.cwd();
+const DIR_SHARE = process.env.DIR_SHARE;
+
+if (!DIR_SHARE) {
+  console.error('ERROR: DIR_SHARE environment variable is not set.');
+  console.error('Please create a .env file with DIR_SHARE=<path-to-share>');
+  process.exit(1);
+}
+
+// Resolve the shared directory path
+const SERVE_DIR = path.resolve(DIR_SHARE);
+
+// Verify the directory exists
+if (!fs.existsSync(SERVE_DIR)) {
+  console.error(`ERROR: Directory does not exist: ${SERVE_DIR}`);
+  process.exit(1);
+}
+
+if (!fs.statSync(SERVE_DIR).isDirectory()) {
+  console.error(`ERROR: Path is not a directory: ${SERVE_DIR}`);
+  process.exit(1);
+}
+
+console.log(`Sharing directory: ${SERVE_DIR}`);
 
 // HTML escape function to prevent XSS attacks
 function escapeHtml(unsafe: string): string {
@@ -19,8 +62,8 @@ function escapeHtml(unsafe: string): string {
 // Serve static files from the specified directory
 app.use(express.static(SERVE_DIR));
 
-// List directory contents
-app.get('*', (req: Request, res: Response) => {
+// List directory contents - using middleware instead of wildcard route
+app.use((req: Request, res: Response, next) => {
   // Resolve the full path and ensure it's within SERVE_DIR to prevent path traversal
   const requestedPath = path.resolve(SERVE_DIR, '.' + req.path);
   
