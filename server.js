@@ -96,7 +96,14 @@ app.get('/', (req, res) => {
     });
 
     const fileStatsResults = await Promise.all(fileStatsPromises);
-    const fileStats = fileStatsResults.filter(stat => stat !== null);
+    let fileStats = fileStatsResults.filter(stat => stat !== null);
+    
+    // Filter to only JPG files
+    fileStats = fileStats.filter(file => {
+      const ext = path.extname(file.name).toLowerCase();
+      return ext === '.jpg' || ext === '.jpeg';
+    });
+    
     fileStats.sort((a, b) => b.birthtime.getTime() - a.birthtime.getTime());
 
     // Generate HTML response
@@ -106,84 +113,93 @@ app.get('/', (req, res) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>File Directory</title>
+  <title>Image Gallery</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      max-width: 1200px;
+      max-width: 1400px;
       margin: 0 auto;
       padding: 20px;
       background-color: #f5f5f5;
     }
     h1 {
       color: #333;
+      text-align: center;
+      margin-bottom: 30px;
     }
-    table {
-      width: 100%;
+    .gallery {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 20px;
+      padding: 20px 0;
+    }
+    .card {
       background-color: white;
-      border-collapse: collapse;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 15px;
       box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      transition: transform 0.2s, box-shadow 0.2s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
-    th, td {
-      padding: 12px;
-      text-align: left;
-      border-bottom: 1px solid #ddd;
+    .card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
     }
-    th {
-      background-color: #4CAF50;
-      color: white;
-      font-weight: bold;
+    .card-title {
+      font-size: 14px;
+      color: #333;
+      margin: 0 0 10px 0;
+      text-align: center;
+      word-break: break-word;
+      width: 100%;
     }
-    tr:hover {
-      background-color: #f5f5f5;
-    }
-    a {
-      color: #0066cc;
+    .card a {
+      display: block;
       text-decoration: none;
     }
-    a:hover {
-      text-decoration: underline;
+    .card img {
+      width: 200px;
+      height: 200px;
+      object-fit: cover;
+      border-radius: 4px;
+      border: 1px solid #eee;
     }
     .no-files {
-      padding: 20px;
+      padding: 40px;
       text-align: center;
       color: #666;
+      background-color: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
   </style>
 </head>
 <body>
-  <h1>Shared Files</h1>
+  <h1>Image Gallery</h1>
 `;
 
     if (fileStats.length === 0) {
-      html += '<div class="no-files">No files available</div>';
+      html += '<div class="no-files">No JPG images available</div>';
     } else {
-      html += `
-  <table>
-    <thead>
-      <tr>
-        <th>Filename</th>
-        <th>Date Created</th>
-      </tr>
-    </thead>
-    <tbody>
-`;
+      html += '<div class="gallery">\n';
 
       fileStats.forEach(file => {
-        const dateCreated = file.birthtime.toLocaleString();
         const escapedName = escapeHtml(file.name);
+        const encodedName = encodeURIComponent(file.name);
         html += `
-      <tr>
-        <td><a href="/download/${encodeURIComponent(file.name)}">${escapedName}</a></td>
-        <td>${dateCreated}</td>
-      </tr>
+  <div class="card">
+    <h3 class="card-title">${escapedName}</h3>
+    <a href="/download/${encodedName}">
+      <img src="/download/${encodedName}" alt="${escapedName}" loading="lazy">
+    </a>
+  </div>
 `;
       });
 
-      html += `
-    </tbody>
-  </table>
-`;
+      html += '</div>\n';
     }
 
     html += `
